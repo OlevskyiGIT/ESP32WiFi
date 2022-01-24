@@ -180,7 +180,9 @@ void send_HTTP_req(int GET, char *URL, char *body)
 	printf("Connected to the target website\n");
 
 	//Request generation
-	char REQ[strlen(REQ_BEGIN_GET) + strlen(REQ_END_GET) + strlen(URL) + strlen(PORT) - 3];
+	char *REQ;
+	REQ = (char *)malloc((strlen(REQ_BEGIN_GET) + strlen(REQ_END_GET) + strlen(URL) + strlen(PORT) - 3)*sizeof(char));
+	REQ[0] = '\0';
 	strcat(REQ, REQ_BEGIN_GET);
 	strcat(REQ, URL);
 	strcat(REQ, ":");
@@ -194,6 +196,9 @@ void send_HTTP_req(int GET, char *URL, char *body)
 		while(1) vTaskDelay(1000 / portTICK_RATE_MS);
 	}
 	printf("HTTP request sent\n");
+
+	//Response
+
 }
 
 void app_main(void)
