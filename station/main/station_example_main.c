@@ -107,7 +107,7 @@ void wifi_init_sta(char *mySSID, char *myPass)
     strcpy((char *)wifi_config.sta.password, mySSID);
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
-    ESP_ERROR_CHECK(esp_wifi_start() );
+    ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "wifi_init_sta finished.");
 
@@ -137,13 +137,21 @@ void wifi_init_sta(char *mySSID, char *myPass)
     vEventGroupDelete(s_wifi_event_group);
 }
 
-void send_HTTP_req(int GET, char *URL, char *body = NULL)
+void send_HTTP_req(int GET, char *URL, char *body)
 {
 	const struct addrinfo hints =
 	{
 		.ai_family = AF_INET,
 		.ai_socktype = SOCK_STREAM
 	};
+	struct addrinfo *res;
+	char recv_buf[100];
+	int result = getaddrinfo(URL, "80", &hints, &res);
+	if((result != 0) || (res == NULL))
+	{
+		printf("Unable to resolve IP for target website %s\n", URL);
+		while(1) vTaskDelay(1000 / portTICK_RATE_MS);
+	}
 }
 
 void app_main(void)
