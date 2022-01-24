@@ -63,7 +63,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-void wifi_init_sta(void)
+void wifi_init_sta(char *mySSID, char *myPass)
 {
     s_wifi_event_group = xEventGroupCreate();
 
@@ -90,8 +90,6 @@ void wifi_init_sta(void)
 
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = EXAMPLE_ESP_WIFI_SSID,
-            .password = EXAMPLE_ESP_WIFI_PASS,
             /* Setting a password implies station will connect to all security modes including WEP/WPA.
              * However these modes are deprecated and not advisable to be used. Incase your Access point
              * doesn't support WPA2, these mode can be enabled by commenting below line */
@@ -103,6 +101,8 @@ void wifi_init_sta(void)
             },
         },
     };
+    strcpy((char *)wifi_config.sta.ssid, mySSID);
+    strcpy((char *)wifi_config.sta.password, mySSID);
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
     ESP_ERROR_CHECK(esp_wifi_start() );
@@ -135,6 +135,11 @@ void wifi_init_sta(void)
     vEventGroupDelete(s_wifi_event_group);
 }
 
+void send_HHTP_req(void)
+{
+
+}
+
 void app_main(void)
 {
     //Initialize NVS
@@ -146,5 +151,7 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-    wifi_init_sta();
+    char mySSID[] = EXAMPLE_ESP_WIFI_SSID;
+    char myPass[] = EXAMPLE_ESP_WIFI_PASS;
+    wifi_init_sta(mySSID, myPass);
 }
