@@ -152,7 +152,7 @@ void send_HTTP_req(int GET, char *Site, char *resource, char *body)
 	char recv_buf[100];
 
 	//Resolve the IP
-	int result = getaddrinfo(Site, "80", &hints, &res);
+	int result = getaddrinfo(Site, PORT, &hints, &res);
 	if((result != 0) || (res == NULL))
 	{
 		printf("Unable to resolve IP for target website %s\n", Site);
@@ -222,6 +222,20 @@ void send_HTTP_req(int GET, char *Site, char *resource, char *body)
 	}
 }
 
+void workerFun(void *pvParameters)
+{
+	ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
+	char mySSID[] = "SSID";
+	char myPass[] = "Password";
+	wifi_init_sta(mySSID, myPass);
+
+	int GET = 1;
+	char site[] = "http://httpbin.org/";
+	char resource[] = "/";
+	char body[] = "";
+	send_HTTP_req(GET, site, resource, body);
+}
+
 void app_main(void)
 {
     //Initialize NVS
@@ -232,14 +246,5 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
-    ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-    char mySSID[] = "SSID";
-    char myPass[] = "Password";
-    wifi_init_sta(mySSID, myPass);
-
-    int GET = 1;
-    char site[] = "http://httpbin.org/";
-    char resource[] = "/";
-    char body[] = "";
-    send_HTTP_req(GET, site, resource, body);
+    xTaskCreate(workerFun, "Main", 4096, NULL, 5, NULL);
 }
