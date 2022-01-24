@@ -246,5 +246,5 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
-    xTaskCreate(workerFun, "Main", 4096, NULL, 5, NULL);
+    xTaskCreate(&workerFun, "Main", 4096, NULL, 5, NULL);
 }
