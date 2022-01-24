@@ -43,6 +43,10 @@ static const char *TAG = "wifi station";
 
 static int s_retry_num = 0;
 
+#define REQ_BEGIN_GET "GET /HTTP/1.0\r\nHost: "
+#define PORT "80"
+#define REQ_END_GET "\r\nUser-Agent: esp-idf/1.0 esp32\r\n\r\n"
+
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
 {
@@ -146,12 +150,50 @@ void send_HTTP_req(int GET, char *URL, char *body)
 	};
 	struct addrinfo *res;
 	char recv_buf[100];
+
+	//Resolve the IP
 	int result = getaddrinfo(URL, "80", &hints, &res);
 	if((result != 0) || (res == NULL))
 	{
 		printf("Unable to resolve IP for target website %s\n", URL);
 		while(1) vTaskDelay(1000 / portTICK_RATE_MS);
 	}
+	printf("Target website's IP resolved\n");
+
+	//Allocate socket
+	int s = socket(res->ai_family, res->ai_socktype, 0);
+	if(s < 0)
+	{
+		printf("Unable to allocate a new socket\n");
+		while(1) vTaskDelay(1000 / portTICK_RATE_MS);
+	}
+	printf("Socket allocated, id=%d\n", s);
+
+	//Connect to site
+	result = connect(s, res->ai_addr, res->ai_addrlen);
+	if(result != 0)
+	{
+		printf("Unable to connect to the target website\n");
+		close(s);
+		while(1) vTaskDelay(1000 / portTICK_RATE_MS);
+	}
+	printf("Connected to the target website\n");
+
+	//Request generation
+	char REQ[strlen(REQ_BEGIN_GET) + strlen(REQ_END_GET) + strlen(URL) + strlen(PORT) - 3];
+	strcat(REQ, REQ_BEGIN_GET);
+	strcat(REQ, URL);
+	strcat(REQ, ":");
+	strcat(REQ, PORT);
+	strcat(REQ, REQ_END_GET);
+	result = write(s, REQ, strlen(REQ));
+	if(result < 0)
+	{
+		printf("Unable to send the HTTP request\n");
+		close(s);
+		while(1) vTaskDelay(1000 / portTICK_RATE_MS);
+	}
+	printf("HTTP request sent\n");
 }
 
 void app_main(void)
