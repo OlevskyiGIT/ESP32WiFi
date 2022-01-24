@@ -19,14 +19,16 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
+#include "lwip/netdb.h"
+#include "lwip/sockets.h"
+
 /* The examples use WiFi configuration that you can set via project configuration menu
 
    If you'd rather not, just change the below entries to strings with
    the config you want - ie #define EXAMPLE_WIFI_SSID "mywifissid"
 */
-#define EXAMPLE_ESP_WIFI_SSID      CONFIG_ESP_WIFI_SSID
-#define EXAMPLE_ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
-#define EXAMPLE_ESP_MAXIMUM_RETRY  CONFIG_ESP_MAXIMUM_RETRY
+
+#define EXAMPLE_ESP_MAXIMUM_RETRY  50
 
 /* FreeRTOS event group to signal when we are connected*/
 static EventGroupHandle_t s_wifi_event_group;
@@ -121,10 +123,10 @@ void wifi_init_sta(char *mySSID, char *myPass)
      * happened. */
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
-                 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+                 mySSID, myPass);
     } else if (bits & WIFI_FAIL_BIT) {
         ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
-                 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+        		mySSID, myPass);
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
@@ -135,9 +137,13 @@ void wifi_init_sta(char *mySSID, char *myPass)
     vEventGroupDelete(s_wifi_event_group);
 }
 
-void send_HHTP_req(void)
+void send_HTTP_req(int GET, char *URL, char *body = NULL)
 {
-
+	const struct addrinfo hints =
+	{
+		.ai_family = AF_INET,
+		.ai_socktype = SOCK_STREAM
+	};
 }
 
 void app_main(void)
@@ -151,7 +157,12 @@ void app_main(void)
     ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
-    char mySSID[] = EXAMPLE_ESP_WIFI_SSID;
-    char myPass[] = EXAMPLE_ESP_WIFI_PASS;
+    char mySSID[] = "SSID";
+    char myPass[] = "Password";
     wifi_init_sta(mySSID, myPass);
+
+    int GET = 1;
+    char URL[] = "http://httpbin.org/";
+    char body[] = "";
+    send_HTTP_req(GET, URL, body);
 }
