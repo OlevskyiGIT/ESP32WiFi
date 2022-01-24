@@ -43,7 +43,7 @@ static const char *TAG = "wifi station";
 
 static int s_retry_num = 0;
 
-#define REQ_BEGIN_GET "GET /HTTP/1.0\r\nHost: "
+#define REQ_BEGIN_GET "GET / HTTP/1.0\r\nHost: "
 #define PORT "80"
 #define REQ_END_GET "\r\nUser-Agent: esp-idf/1.0 esp32\r\n\r\n"
 
@@ -141,7 +141,7 @@ void wifi_init_sta(char *mySSID, char *myPass)
     vEventGroupDelete(s_wifi_event_group);
 }
 
-void send_HTTP_req(int GET, char *URL, char *body)
+void send_HTTP_req(int GET, char *Site, char *resource, char *body)
 {
 	const struct addrinfo hints =
 	{
@@ -152,10 +152,10 @@ void send_HTTP_req(int GET, char *URL, char *body)
 	char recv_buf[100];
 
 	//Resolve the IP
-	int result = getaddrinfo(URL, "80", &hints, &res);
+	int result = getaddrinfo(Site, "80", &hints, &res);
 	if((result != 0) || (res == NULL))
 	{
-		printf("Unable to resolve IP for target website %s\n", URL);
+		printf("Unable to resolve IP for target website %s\n", Site);
 		while(1) vTaskDelay(1000 / portTICK_RATE_MS);
 	}
 	printf("Target website's IP resolved\n");
@@ -181,10 +181,12 @@ void send_HTTP_req(int GET, char *URL, char *body)
 
 	//Request generation
 	char *REQ;
-	REQ = (char *)malloc((strlen(REQ_BEGIN_GET) + strlen(REQ_END_GET) + strlen(URL) + strlen(PORT) - 3)*sizeof(char));
+	REQ = (char *)malloc((strlen("GET ") + strlen(resource) + strlen(REQ_BEGIN_GET) + strlen(REQ_END_GET) + strlen(Site) + strlen(PORT) - 4)*sizeof(char));
 	REQ[0] = '\0';
+	strcat(REQ, "GET");
+	strcat(REQ, resource);
 	strcat(REQ, REQ_BEGIN_GET);
-	strcat(REQ, URL);
+	strcat(REQ, Site);
 	strcat(REQ, ":");
 	strcat(REQ, PORT);
 	strcat(REQ, REQ_END_GET);
@@ -198,7 +200,26 @@ void send_HTTP_req(int GET, char *URL, char *body)
 	printf("HTTP request sent\n");
 
 	//Response
+	printf("Response:\r\n");
+	int r;
+	do
+	{
+		bzero(recv_buf, sizeof(recv_buf));
+		r = read(s, recv_buf, sizeof(recv_buf) - 1);
+		for(int i = 0; i < r; i++)
+		{
+			putchar(recv_buf[i]);
+		}
+	}
+	while(r > 0);
 
+	close(s);
+	printf("Socket closed\r\n");
+
+	while(1)
+	{
+		vTaskDelay(1000 / portTICK_RATE_MS);
+	}
 }
 
 void app_main(void)
@@ -217,7 +238,8 @@ void app_main(void)
     wifi_init_sta(mySSID, myPass);
 
     int GET = 1;
-    char URL[] = "http://httpbin.org/";
+    char site[] = "http://httpbin.org/";
+    char resource[] = "/";
     char body[] = "";
-    send_HTTP_req(GET, URL, body);
+    send_HTTP_req(GET, site, resource, body);
 }
