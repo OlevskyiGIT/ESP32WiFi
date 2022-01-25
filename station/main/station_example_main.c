@@ -275,14 +275,25 @@ void workerFun(void *pvParameters)
 	wifi_init_sta(mySSID, myPass);
 	myUARTInit();
 	int GET = 0;
-	char site[100];
-	char body[100];
+	char site[127];
+	char body[127];
+	int len;
 	while(1)
 	{
-		ESP_LOGI(TAG, "Please enter the site address:\r\n");
-		fgets(site, sizeof(site), stdin);
-		ESP_LOGI(TAG, "Please enter the body:\r\n");
-		fgets(body, sizeof(body), stdin);
+		myUARTSend("Please enter the site address:\r\n");
+		do
+		{
+			len = uart_read_bytes(UART_NUM_1, UARTRecBuf, 127, 100 / portTICK_RATE_MS);
+		}
+		while(len <= 0);
+		strcpy(site, UARTRecBuf);
+		myUARTSend("Please enter the body:\r\n");
+		do
+		{
+			len = uart_read_bytes(UART_NUM_1, UARTRecBuf, 127, 100 / portTICK_RATE_MS);
+		}
+		while(len <= 0);
+		strcpy(body, UARTRecBuf);
 		if(body[0] == '\n') GET = 1;
 		send_HTTP_req(GET, site, body);
 	}
