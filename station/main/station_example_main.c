@@ -22,6 +22,8 @@
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 
+#include "driver/uart.h"
+
 /* The examples use WiFi configuration that you can set via project configuration menu
 
    If you'd rather not, just change the below entries to strings with
@@ -44,6 +46,31 @@ static EventGroupHandle_t s_wifi_event_group;
 static const char *TAG = "wifi station";
 
 static int s_retry_num = 0;
+char UARTRecBuf[127];
+char UARTSendBuf[127];
+
+void myUARTInit(void)
+{
+	uart_config_t uart_config = {
+	        .baud_rate = 115200,
+	        .data_bits = UART_DATA_8_BITS,
+	        .parity = UART_PARITY_DISABLE,
+	        .stop_bits = UART_STOP_BITS_1,
+	        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+	        .rx_flow_ctrl_thresh = 122,
+	        .source_clk = UART_SCLK_APB,
+	    };
+	ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, 127, 127, 0, NULL, 0));
+	ESP_ERROR_CHECK(uart_param_config(UART_NUM_1, &uart_config));
+	ESP_ERROR_CHECK(uart_set_pin(UART_NUM_1, 23, 22, 18, UART_PIN_NO_CHANGE));
+	ESP_ERROR_CHECK(uart_set_mode(UART_NUM_1, UART_MODE_RS485_HALF_DUPLEX));
+	ESP_ERROR_CHECK(uart_set_rx_timeout(UART_NUM_1, 3));
+}
+
+static inline void myUARTSend(char *toSend)
+{
+	uart_write_bytes(UART_NUM_1, (const char *)toSend, strlen(toSend));
+}
 
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
@@ -59,18 +86,19 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         	vTaskDelay(1000 / portTICK_RATE_MS);
             esp_wifi_connect();
             s_retry_num++;
-            ESP_LOGI(TAG, "retry to connect to the AP");
+            myUARTSend("retry to connect to the AP");
         }
         else
         {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
-        ESP_LOGI(TAG,"connect to the AP fail");
+        myUARTSend("connect to the AP fail");
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        sprintf(UARTSendBuf, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+        myUARTSend(UARTSendBuf);
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
@@ -120,7 +148,7 @@ void wifi_init_sta(char *mySSID, char *myPass)
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "wifi_init_sta finished.");
+    myUARTSend("wifi_init_sta finished.");
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
@@ -134,16 +162,17 @@ void wifi_init_sta(char *mySSID, char *myPass)
      * happened. */
     if (bits & WIFI_CONNECTED_BIT)
     {
-        ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
-                 mySSID, myPass);
-    } else if (bits & WIFI_FAIL_BIT)
+    	sprintf(UARTSendBuf, "connected to ap SSID:%s password:%s", mySSID, myPass);
+        myUARTSend(UARTSendBuf);
+    }
+    else if (bits & WIFI_FAIL_BIT)
     {
-        ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
-        		mySSID, myPass);
+    	sprintf(UARTSendBuf, "Failed to connect to SSID:%s, password:%s", mySSID, myPass);
+    	myUARTSend(UARTSendBuf);
     }
     else
     {
-        ESP_LOGE(TAG, "UNEXPECTED EVENT");
+    	myUARTSend("UNEXPECTED EVENT");
     }
 
     /* The event will not be processed after unregister */
@@ -160,7 +189,6 @@ void send_HTTP_req(int GET, char *Site, char *body)
 		.ai_socktype = SOCK_STREAM
 	};
 	struct addrinfo *res;
-	char recv_buf[100];
 	int s;
 	while(1)
 	{
@@ -168,17 +196,18 @@ void send_HTTP_req(int GET, char *Site, char *body)
 		int result = getaddrinfo(Site, PORT, &hints, &res);
 		if((result != 0) || (res == NULL))
 		{
-			ESP_LOGI(TAG, "Unable to resolve IP for target website %s\n", Site);
+			sprintf(UARTSendBuf, "Unable to resolve IP for target website %s\n", Site);
+			myUARTSend(UARTSendBuf);
 			vTaskDelay(1000 / portTICK_RATE_MS);
 			continue;
 		}
-		printf("Target website's IP resolved\n");
+		myUARTSend("Target website's IP resolved\n");
 
 		//Allocate socket
 		s = socket(res->ai_family, res->ai_socktype, 0);
 		if(s < 0)
 		{
-			ESP_LOGI(TAG, "Unable to allocate a new socket\n");
+			myUARTSend("Unable to allocate a new socket\n");
 			vTaskDelay(1000 / portTICK_RATE_MS);
 			continue;
 		}
@@ -188,12 +217,12 @@ void send_HTTP_req(int GET, char *Site, char *body)
 		result = connect(s, res->ai_addr, res->ai_addrlen);
 		if(result != 0)
 		{
-			ESP_LOGI(TAG, "Unable to connect to the target website\n");
+			myUARTSend("Unable to connect to the target website\n");
 			close(s);
 			vTaskDelay(1000 / portTICK_RATE_MS);
 			continue;
 		}
-		ESP_LOGI(TAG, "Connected to the target website\n");
+		myUARTSend("Connected to the target website\n");
 
 		//Request generation
 		char *REQ;
@@ -214,36 +243,28 @@ void send_HTTP_req(int GET, char *Site, char *body)
 		free(REQ);
 		if(result < 0)
 		{
-			ESP_LOGI(TAG, "Unable to send the HTTP request\n");
+			myUARTSend("Unable to send the HTTP request\n");
 			close(s);
 			vTaskDelay(1000 / portTICK_RATE_MS);
 			continue;
 		}
-		ESP_LOGI(TAG, "HTTP request sent\n");
+		myUARTSend("HTTP request sent\n");
 		break;
 	}
 
 	//Response
-	ESP_LOGI(TAG, "Response:\r\n");
+	myUARTSend("Response:\r\n");
 	int r;
 	do
 	{
-		bzero(recv_buf, sizeof(recv_buf));
-		r = read(s, recv_buf, sizeof(recv_buf) - 1);
-		for(int i = 0; i < r; i++)
-		{
-			putchar(recv_buf[i]);
-		}
+		bzero(UARTSendBuf, sizeof(UARTSendBuf));
+		r = read(s, UARTSendBuf, sizeof(UARTSendBuf) - 1);
+		myUARTSend(UARTSendBuf);
 	}
 	while(r > 0);
 
 	close(s);
-	ESP_LOGI(TAG, "Socket closed\r\n");
-
-	while(1)
-	{
-		vTaskDelay(1000 / portTICK_RATE_MS);
-	}
+	myUARTSend("Socket closed\r\n");
 }
 
 void workerFun(void *pvParameters)
@@ -252,7 +273,7 @@ void workerFun(void *pvParameters)
 	char mySSID[] = "SSID";
 	char myPass[] = "Password";
 	wifi_init_sta(mySSID, myPass);
-
+	myUARTInit();
 	int GET = 0;
 	char site[100];
 	char body[100];
