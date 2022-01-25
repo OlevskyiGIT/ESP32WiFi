@@ -39,13 +39,11 @@ static EventGroupHandle_t s_wifi_event_group;
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
+#define PORT "80"
+
 static const char *TAG = "wifi station";
 
 static int s_retry_num = 0;
-
-#define REQ_BEGIN " HTTP/1.0\r\nHost: "
-#define PORT "80"
-#define REQ_END "\r\nUser-Agent: esp-idf/1.0 esp32\r\n\r\n"
 
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
@@ -154,7 +152,7 @@ void wifi_init_sta(char *mySSID, char *myPass)
     vEventGroupDelete(s_wifi_event_group);
 }
 
-void send_HTTP_req(int GET, char *Site, char *resource, char *body)
+void send_HTTP_req(int GET, char *Site, char *body)
 {
 	const struct addrinfo hints =
 	{
@@ -163,65 +161,70 @@ void send_HTTP_req(int GET, char *Site, char *resource, char *body)
 	};
 	struct addrinfo *res;
 	char recv_buf[100];
+	int s;
+	while(1)
+	{
+		//Resolve the IP
+		int result = getaddrinfo(Site, PORT, &hints, &res);
+		if((result != 0) || (res == NULL))
+		{
+			ESP_LOGI(TAG, "Unable to resolve IP for target website %s\n", Site);
+			vTaskDelay(1000 / portTICK_RATE_MS);
+			continue;
+		}
+		printf("Target website's IP resolved\n");
 
-	//Resolve the IP
-	int result = getaddrinfo(Site, PORT, &hints, &res);
-	if((result != 0) || (res == NULL))
-	{
-		printf("Unable to resolve IP for target website %s\n", Site);
-		while(1) vTaskDelay(1000 / portTICK_RATE_MS);
-	}
-	printf("Target website's IP resolved\n");
+		//Allocate socket
+		s = socket(res->ai_family, res->ai_socktype, 0);
+		if(s < 0)
+		{
+			ESP_LOGI(TAG, "Unable to allocate a new socket\n");
+			vTaskDelay(1000 / portTICK_RATE_MS);
+			continue;
+		}
+		ESP_LOGI(TAG, "Socket allocated, id=%d\n", s);
 
-	//Allocate socket
-	int s = socket(res->ai_family, res->ai_socktype, 0);
-	if(s < 0)
-	{
-		printf("Unable to allocate a new socket\n");
-		while(1) vTaskDelay(1000 / portTICK_RATE_MS);
-	}
-	printf("Socket allocated, id=%d\n", s);
+		//Connect to site
+		result = connect(s, res->ai_addr, res->ai_addrlen);
+		if(result != 0)
+		{
+			ESP_LOGI(TAG, "Unable to connect to the target website\n");
+			close(s);
+			vTaskDelay(1000 / portTICK_RATE_MS);
+			continue;
+		}
+		ESP_LOGI(TAG, "Connected to the target website\n");
 
-	//Connect to site
-	result = connect(s, res->ai_addr, res->ai_addrlen);
-	if(result != 0)
-	{
-		printf("Unable to connect to the target website\n");
-		close(s);
-		while(1) vTaskDelay(1000 / portTICK_RATE_MS);
+		//Request generation
+		char *REQ;
+		if(GET)
+		{
+			REQ = (char *)calloc(strlen("http GET ") + strlen(Site), sizeof(char));
+			strcat(REQ, "http GET ");
+			strcat(REQ, Site);
+		}
+		else
+		{
+			REQ = (char *)calloc(strlen("http POST ") + strlen(Site) + strlen(body) - 5, sizeof(char));
+			strcat(REQ, "http POST ");
+			strcat(REQ, Site);
+			strcat(REQ, body);
+		}
+		result = write(s, REQ, strlen(REQ));
+		free(REQ);
+		if(result < 0)
+		{
+			ESP_LOGI(TAG, "Unable to send the HTTP request\n");
+			close(s);
+			vTaskDelay(1000 / portTICK_RATE_MS);
+			continue;
+		}
+		ESP_LOGI(TAG, "HTTP request sent\n");
+		break;
 	}
-	printf("Connected to the target website\n");
-
-	//Request generation
-	char *REQ;
-	if(GET)
-	{
-		REQ = (char *)malloc((strlen("GET ") + strlen(resource) + strlen(REQ_BEGIN) + strlen(REQ_END) + strlen(Site) + strlen(PORT) - 4)*sizeof(char));
-		REQ[0] = '\0';
-		strcat(REQ, "GET");
-		strcat(REQ, resource);
-		strcat(REQ, REQ_BEGIN);
-		strcat(REQ, Site);
-		strcat(REQ, ":");
-		strcat(REQ, PORT);
-		strcat(REQ, REQ_END);
-	}
-	else
-	{
-
-	}
-	result = write(s, REQ, strlen(REQ));
-	free(REQ);
-	if(result < 0)
-	{
-		printf("Unable to send the HTTP request\n");
-		close(s);
-		while(1) vTaskDelay(1000 / portTICK_RATE_MS);
-	}
-	printf("HTTP request sent\n");
 
 	//Response
-	printf("Response:\r\n");
+	ESP_LOGI(TAG, "Response:\r\n");
 	int r;
 	do
 	{
@@ -235,7 +238,7 @@ void send_HTTP_req(int GET, char *Site, char *resource, char *body)
 	while(r > 0);
 
 	close(s);
-	printf("Socket closed\r\n");
+	ESP_LOGI(TAG, "Socket closed\r\n");
 
 	while(1)
 	{
@@ -254,7 +257,7 @@ void workerFun(void *pvParameters)
 	char site[] = "http://httpbin.org/";
 	char resource[] = "/";
 	char body[] = "";
-	send_HTTP_req(GET, site, resource, body);
+	send_HTTP_req(GET, site, body);
 }
 
 void app_main(void)
