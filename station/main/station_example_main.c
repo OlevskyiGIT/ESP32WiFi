@@ -43,9 +43,9 @@ static const char *TAG = "wifi station";
 
 static int s_retry_num = 0;
 
-#define REQ_BEGIN_GET " HTTP/1.0\r\nHost: "
+#define REQ_BEGIN " HTTP/1.0\r\nHost: "
 #define PORT "80"
-#define REQ_END_GET "\r\nUser-Agent: esp-idf/1.0 esp32\r\n\r\n"
+#define REQ_END "\r\nUser-Agent: esp-idf/1.0 esp32\r\n\r\n"
 
 static void event_handler(void* arg, esp_event_base_t event_base,
                                 int32_t event_id, void* event_data)
@@ -194,16 +194,24 @@ void send_HTTP_req(int GET, char *Site, char *resource, char *body)
 
 	//Request generation
 	char *REQ;
-	REQ = (char *)malloc((strlen("GET ") + strlen(resource) + strlen(REQ_BEGIN_GET) + strlen(REQ_END_GET) + strlen(Site) + strlen(PORT) - 4)*sizeof(char));
-	REQ[0] = '\0';
-	strcat(REQ, "GET");
-	strcat(REQ, resource);
-	strcat(REQ, REQ_BEGIN_GET);
-	strcat(REQ, Site);
-	strcat(REQ, ":");
-	strcat(REQ, PORT);
-	strcat(REQ, REQ_END_GET);
+	if(GET)
+	{
+		REQ = (char *)malloc((strlen("GET ") + strlen(resource) + strlen(REQ_BEGIN) + strlen(REQ_END) + strlen(Site) + strlen(PORT) - 4)*sizeof(char));
+		REQ[0] = '\0';
+		strcat(REQ, "GET");
+		strcat(REQ, resource);
+		strcat(REQ, REQ_BEGIN);
+		strcat(REQ, Site);
+		strcat(REQ, ":");
+		strcat(REQ, PORT);
+		strcat(REQ, REQ_END);
+	}
+	else
+	{
+
+	}
 	result = write(s, REQ, strlen(REQ));
+	free(REQ);
 	if(result < 0)
 	{
 		printf("Unable to send the HTTP request\n");
