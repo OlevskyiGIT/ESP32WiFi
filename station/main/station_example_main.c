@@ -287,7 +287,7 @@ void workerFun(void *pvParameters)
 		}
 		while(len <= 0);
 		strcpy(site, UARTRecBuf);
-		myUARTSend("Please enter the body:\r\n");
+		myUARTSend("Please enter the body (nothing to send a GET):\r\n");
 		do
 		{
 			len = uart_read_bytes(UART_NUM_1, UARTRecBuf, 127, 100 / portTICK_RATE_MS);
