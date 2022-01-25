@@ -275,8 +275,9 @@ void workerFun(void *pvParameters)
 	wifi_init_sta(mySSID, myPass);
 	myUARTInit();
 	int GET = 0;
-	char site[127];
-	char body[127];
+	char *buffer;
+	char *site = (char *)calloc(127, sizeof(char));
+	char *body = (char *)calloc(127, sizeof(char));;
 	int len;
 	while(1)
 	{
@@ -287,6 +288,19 @@ void workerFun(void *pvParameters)
 		}
 		while(len <= 0);
 		strcpy(site, UARTRecBuf);
+		if(len == 127)
+		{
+			do
+			{
+				len = uart_read_bytes(UART_NUM_1, UARTRecBuf, 127, 100 / portTICK_RATE_MS);
+				buffer = (char *)calloc(strlen(site) + len, sizeof(char));
+				strcat(buffer, site);
+				strcat(buffer, UARTRecBuf);
+				free(site);
+				site = buffer;
+			}
+			while(len > 0);
+		}
 		myUARTSend("Please enter the body (nothing to send a GET):\r\n");
 		do
 		{
@@ -294,6 +308,19 @@ void workerFun(void *pvParameters)
 		}
 		while(len <= 0);
 		strcpy(body, UARTRecBuf);
+		if(len == 127)
+		{
+			do
+			{
+				len = uart_read_bytes(UART_NUM_1, UARTRecBuf, 127, 100 / portTICK_RATE_MS);
+				buffer = (char *)calloc(strlen(site) + len, sizeof(char));
+				strcat(buffer, body);
+				strcat(buffer, UARTRecBuf);
+				free(body);
+				body = buffer;
+			}
+			while(len > 0);
+		}
 		if(body[0] == '\n') GET = 1;
 		send_HTTP_req(GET, site, body);
 	}
