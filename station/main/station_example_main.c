@@ -43,7 +43,7 @@ static const char *TAG = "wifi station";
 
 static int s_retry_num = 0;
 
-#define REQ_BEGIN_GET "GET / HTTP/1.0\r\nHost: "
+#define REQ_BEGIN_GET " HTTP/1.0\r\nHost: "
 #define PORT "80"
 #define REQ_END_GET "\r\nUser-Agent: esp-idf/1.0 esp32\r\n\r\n"
 
