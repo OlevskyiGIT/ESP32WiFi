@@ -199,13 +199,13 @@ void send_HTTP_req(int GET, char *Site, char *body)
 		char *REQ;
 		if(GET)
 		{
-			REQ = (char *)calloc(strlen("http GET ") + strlen(Site), sizeof(char));
+			REQ = (char *)calloc(strlen("http GET ") + strlen(Site) + 1, sizeof(char));
 			strcat(REQ, "http GET ");
 			strcat(REQ, Site);
 		}
 		else
 		{
-			REQ = (char *)calloc(strlen("http POST ") + strlen(Site) + strlen(body) - 5, sizeof(char));
+			REQ = (char *)calloc(strlen("http POST ") + strlen(Site) + strlen(body) + 1, sizeof(char));
 			strcat(REQ, "http POST ");
 			strcat(REQ, Site);
 			strcat(REQ, body);
@@ -253,11 +253,18 @@ void workerFun(void *pvParameters)
 	char myPass[] = "Password";
 	wifi_init_sta(mySSID, myPass);
 
-	int GET = 1;
-	char site[] = "http://httpbin.org/";
-	char resource[] = "/";
-	char body[] = "";
-	send_HTTP_req(GET, site, body);
+	int GET = 0;
+	char site[100];
+	char body[100];
+	while(1)
+	{
+		ESP_LOGI(TAG, "Please enter the site address:\r\n");
+		fgets(site, sizeof(site), stdin);
+		ESP_LOGI(TAG, "Please enter the body:\r\n");
+		fgets(body, sizeof(body), stdin);
+		if(body[0] == '\n') GET = 1;
+		send_HTTP_req(GET, site, body);
+	}
 }
 
 void app_main(void)
