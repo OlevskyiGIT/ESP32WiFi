@@ -90,6 +90,7 @@ static void event_handler(void* arg, esp_event_base_t event_base,
         }
         else
         {
+        	s_retry_num = 0;
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
         myUARTSend("connect to the AP fail");
@@ -106,79 +107,84 @@ static void event_handler(void* arg, esp_event_base_t event_base,
 
 void wifi_init_sta(char *mySSID, char *myPass)
 {
-    s_wifi_event_group = xEventGroupCreate();
+	int trying = 1;
+	while(trying)
+	{
+		s_wifi_event_group = xEventGroupCreate();
 
-    ESP_ERROR_CHECK(esp_netif_init());
+		ESP_ERROR_CHECK(esp_netif_init());
 
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_sta();
+		ESP_ERROR_CHECK(esp_event_loop_create_default());
+		esp_netif_create_default_wifi_sta();
 
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+		wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+		ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    esp_event_handler_instance_t instance_any_id;
-    esp_event_handler_instance_t instance_got_ip;
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
-                                                        ESP_EVENT_ANY_ID,
-                                                        &event_handler,
-                                                        NULL,
-                                                        &instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
-                                                        IP_EVENT_STA_GOT_IP,
-                                                        &event_handler,
-                                                        NULL,
-                                                        &instance_got_ip));
+		esp_event_handler_instance_t instance_any_id;
+		esp_event_handler_instance_t instance_got_ip;
+		ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
+															ESP_EVENT_ANY_ID,
+															&event_handler,
+															NULL,
+															&instance_any_id));
+		ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
+															IP_EVENT_STA_GOT_IP,
+															&event_handler,
+															NULL,
+															&instance_got_ip));
 
-    wifi_config_t wifi_config = {
-        .sta = {
-            /* Setting a password implies station will connect to all security modes including WEP/WPA.
-             * However these modes are deprecated and not advisable to be used. Incase your Access point
-             * doesn't support WPA2, these mode can be enabled by commenting below line */
-	     .threshold.authmode = WIFI_AUTH_WPA2_PSK,
+		wifi_config_t wifi_config = {
+			.sta = {
+				/* Setting a password implies station will connect to all security modes including WEP/WPA.
+				 * However these modes are deprecated and not advisable to be used. Incase your Access point
+				 * doesn't support WPA2, these mode can be enabled by commenting below line */
+			 .threshold.authmode = WIFI_AUTH_WPA2_PSK,
 
-            .pmf_cfg = {
-                .capable = true,
-                .required = false
-            },
-        },
-    };
-    strcpy((char *)wifi_config.sta.ssid, mySSID);
-    strcpy((char *)wifi_config.sta.password, mySSID);
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
-    ESP_ERROR_CHECK(esp_wifi_start());
+				.pmf_cfg = {
+					.capable = true,
+					.required = false
+				},
+			},
+		};
+		strcpy((char *)wifi_config.sta.ssid, mySSID);
+		strcpy((char *)wifi_config.sta.password, mySSID);
+		ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
+		ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+		ESP_ERROR_CHECK(esp_wifi_start());
 
-    myUARTSend("wifi_init_sta finished.");
+		myUARTSend("wifi_init_sta finished.");
 
-    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
-     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
-    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-            pdFALSE,
-            pdFALSE,
-            portMAX_DELAY);
+		/* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
+		 * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
+		EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
+				WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
+				pdFALSE,
+				pdFALSE,
+				portMAX_DELAY);
 
-    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
-     * happened. */
-    if (bits & WIFI_CONNECTED_BIT)
-    {
-    	sprintf(UARTSendBuf, "connected to ap SSID:%s password:%s", mySSID, myPass);
-        myUARTSend(UARTSendBuf);
-    }
-    else if (bits & WIFI_FAIL_BIT)
-    {
-    	sprintf(UARTSendBuf, "Failed to connect to SSID:%s, password:%s", mySSID, myPass);
-    	myUARTSend(UARTSendBuf);
-    }
-    else
-    {
-    	myUARTSend("UNEXPECTED EVENT");
-    }
+		/* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
+		 * happened. */
+		if (bits & WIFI_CONNECTED_BIT)
+		{
+			sprintf(UARTSendBuf, "connected to ap SSID:%s password:%s", mySSID, myPass);
+			myUARTSend(UARTSendBuf);
+			trying = 0;
+		}
+		else if (bits & WIFI_FAIL_BIT)
+		{
+			sprintf(UARTSendBuf, "Failed to connect to SSID:%s, password:%s", mySSID, myPass);
+			myUARTSend(UARTSendBuf);
+		}
+		else
+		{
+			myUARTSend("UNEXPECTED EVENT");
+		}
 
-    /* The event will not be processed after unregister */
-    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip));
-    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id));
-    vEventGroupDelete(s_wifi_event_group);
+		/* The event will not be processed after unregister */
+		ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip));
+		ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id));
+		vEventGroupDelete(s_wifi_event_group);
+	}
 }
 
 void send_HTTP_req(int GET, char *Site, char *body)
@@ -294,13 +300,14 @@ void workerFun(void *pvParameters)
 			do
 			{
 				len = uart_read_bytes(UART_NUM_1, UARTRecBuf, 127, 100 / portTICK_RATE_MS);
+				if(len <= 0) break;
 				buffer = (char *)calloc(strlen(site) + len, sizeof(char));
 				strcat(buffer, site);
 				strcat(buffer, UARTRecBuf);
 				free(site);
 				site = buffer;
 			}
-			while(len > 0);
+			while(1);
 		}
 		myUARTSend("Please enter the body (nothing to send a GET):\r\n");
 		do
@@ -315,6 +322,7 @@ void workerFun(void *pvParameters)
 			do
 			{
 				len = uart_read_bytes(UART_NUM_1, UARTRecBuf, 127, 100 / portTICK_RATE_MS);
+				if(len <= 0) break;
 				buffer = (char *)calloc(strlen(body) + len, sizeof(char));
 				strcat(buffer, body);
 				strcat(buffer, UARTRecBuf);
