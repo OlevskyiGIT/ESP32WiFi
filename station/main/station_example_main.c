@@ -276,8 +276,8 @@ void workerFun(void *pvParameters)
 	myUARTInit();
 	int GET = 0;
 	char *buffer;
-	char *site = (char *)calloc(127, sizeof(char));
-	char *body = (char *)calloc(127, sizeof(char));;
+	char *site;
+	char *body;
 	int len;
 	while(1)
 	{
@@ -287,8 +287,9 @@ void workerFun(void *pvParameters)
 			len = uart_read_bytes(UART_NUM_1, UARTRecBuf, 127, 100 / portTICK_RATE_MS);
 		}
 		while(len <= 0);
+		site = (char *)calloc(len, sizeof(char));
 		strcpy(site, UARTRecBuf);
-		if(len == 127)
+		if(len > 126)
 		{
 			do
 			{
@@ -307,13 +308,14 @@ void workerFun(void *pvParameters)
 			len = uart_read_bytes(UART_NUM_1, UARTRecBuf, 127, 100 / portTICK_RATE_MS);
 		}
 		while(len <= 0);
+		body = (char *)calloc(len, sizeof(char));
 		strcpy(body, UARTRecBuf);
-		if(len == 127)
+		if(len > 126)
 		{
 			do
 			{
 				len = uart_read_bytes(UART_NUM_1, UARTRecBuf, 127, 100 / portTICK_RATE_MS);
-				buffer = (char *)calloc(strlen(site) + len, sizeof(char));
+				buffer = (char *)calloc(strlen(body) + len, sizeof(char));
 				strcat(buffer, body);
 				strcat(buffer, UARTRecBuf);
 				free(body);
