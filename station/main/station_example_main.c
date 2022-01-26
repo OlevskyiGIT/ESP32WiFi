@@ -265,9 +265,10 @@ void send_HTTP_req(int GET, char *Site, char *body)
 	{
 		bzero(UARTSendBuf, sizeof(UARTSendBuf));
 		r = read(s, UARTSendBuf, sizeof(UARTSendBuf) - 1);
+		if(r <= 0) break;
 		myUARTSend(UARTSendBuf);
 	}
-	while(r > 0);
+	while(1);
 
 	close(s);
 	myUARTSend("Socket closed\r\n");
